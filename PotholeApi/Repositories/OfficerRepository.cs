@@ -1,0 +1,82 @@
+﻿using Microsoft.AspNetCore.Identity;
+using Microsoft.EntityFrameworkCore;
+using PotholeApi.IRepositories;
+using PotholeApi.Models;
+using System;
+
+namespace PotholeApi.Repositories
+{
+    public class OfficerRepository : IOfficerRepository
+    {
+        private readonly Context _context;
+        private readonly UserManager<ApplicationUser> _userManager;
+
+        public OfficerRepository(Context context,UserManager<ApplicationUser> userManager)
+        {
+            _context = context;
+            _userManager = userManager;
+        }
+
+        public async Task<ICollection<Officer>> GetAllAsync()
+        {
+            // Uses AsNoTracking for read-only operations to improve performance
+            return await _context.Officers
+                                 .AsNoTracking()
+                                 .ToListAsync();
+        }
+
+        public async Task<Officer?> GetByIdAsync(int id)
+        {
+
+            return await _context.Officers.FindAsync(id);
+        }
+
+        public async Task<Officer?> GetOfficerWithJobTasksAsync(int id)
+        {
+            // Includes the list of JobTasks when fetching the Officer
+            return await _context.Officers
+                                 .Include(o => o.JobTasks)
+                                 .FirstOrDefaultAsync(o => o.Id == id);
+        }
+
+        public async Task AddAsync(Officer officer)
+        {      
+            await _context.Officers.AddAsync(officer);
+            await _context.SaveChangesAsync();
+        }
+
+        public async Task UpdateAsync(Officer officer)
+        {
+            _context.Officers.Update(officer);
+            await _context.SaveChangesAsync();
+        }
+
+        public async Task DeleteAsync(int id)
+        {
+            var officer = await _context.Officers.FindAsync(id);
+            if (officer != null)
+            {
+                _context.Officers.Remove(officer);
+                await _context.SaveChangesAsync();
+            }
+        }
+        public async Task DoesExist(int id)
+        {
+            var exists = await _context.Officers.AnyAsync(o => o.Id == id);
+            if (!exists)
+            {
+                throw new Exception($"Officer with ID {id} does not exist.");
+            }
+        }
+        public async Task<Officer> GetOfficerByUserIdAsync(string userId)
+        {
+            var officer = await _context.Officers
+                                        .FirstOrDefaultAsync(o => o.ApplicationUser.Id == userId);
+            if (officer == null)
+            {
+                throw new Exception($"Officer with User ID {userId} does not exist.");
+            }
+            return officer;
+        }
+    }
+}

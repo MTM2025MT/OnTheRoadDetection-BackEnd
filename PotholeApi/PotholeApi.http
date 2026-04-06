@@ -1,0 +1,6 @@
+@PotholeApi_HostAddress = http://localhost:5280
+
+GET {{PotholeApi_HostAddress}}/weatherforecast/
+Accept: application/json
+
+###

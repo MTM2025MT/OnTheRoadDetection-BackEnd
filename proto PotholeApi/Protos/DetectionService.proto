@@ -1,0 +1,27 @@
+syntax = "proto3";
+option csharp_namespace = "PotholeApi.Protos";
+import "google/protobuf/timestamp.proto";
+
+service PotholeService {
+  rpc AddData (PotholeRequest) returns (PotholeResponse);
+}
+
+message PotholeRequest {
+  Location location = 1;
+  int32 level_of_severity = 2;
+  string description = 3;
+  google.protobuf.Timestamp timestamp = 4;
+  bytes image = 5;                // binary image data (jpeg/png)
+  repeated DoubleArray bounding_boxes_arrays = 6;
+  double confidence = 7;
+}
+
+message PotholeResponse {
+  bool success = 1;
+  string message = 2;
+  string imageUrl = 3;            // optional returned location
+}
+
+message DoubleArray { repeated double values = 1; }
+
+message Location { double latitude = 1; double longitude = 2; }syntax = "proto3";
