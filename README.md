@@ -32,3 +32,17 @@ Instead of a standard CRUD application, this system was architected to handle co
 1. Clone the repository:
    ```bash
    git clone [https://github.com/MTM2025MT/OnTheRoadDetection-BackEnd.git](https://github.com/MTM2025MT/OnTheRoadDetection-BackEnd.git)
+   Navigate to the project directory:
+
+Bash
+cd OnTheRoadDetection-BackEnd
+Update the appsettings.json file with your local SQL Server connection string and Cloudinary API credentials.
+
+Apply Entity Framework migrations to build the spatial database:
+
+Bash
+dotnet ef database update
+Run the application:
+
+Bash
+dotnet run
