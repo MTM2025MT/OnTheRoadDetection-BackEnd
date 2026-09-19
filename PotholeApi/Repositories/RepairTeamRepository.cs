@@ -1,4 +1,5 @@
 ﻿    using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Logging;
 using PotholeApi.IRepositories;
 using PotholeApi.Models;
     using System;
@@ -10,10 +11,12 @@ namespace PotholeApi.Repositories
     public class RepairTeamRepository : IRepairTeamRepository
     {
         private readonly Context _context;
+        private readonly ILogger<RepairTeamRepository> _logger;
 
-        public RepairTeamRepository(Context context)
+        public RepairTeamRepository(Context context, ILogger<RepairTeamRepository> logger)
         {
             _context = context;
+            _logger = logger;
         }
 
         public async Task<IEnumerable<RepairTeam>> GetAllAsync()
@@ -40,12 +43,14 @@ namespace PotholeApi.Repositories
         {
             await _context.RepairTeams.AddAsync(repairTeam);
             await _context.SaveChangesAsync();
+            _logger.LogInformation("Created repair team {RepairTeamId}", repairTeam.Id);
         }
 
         public async Task UpdateAsync(RepairTeam repairTeam)
         {
             _context.RepairTeams.Update(repairTeam);
             await _context.SaveChangesAsync();
+            _logger.LogInformation("Updated repair team {RepairTeamId}", repairTeam.Id);
         }
 
         public async Task DeleteAsync(int id)
@@ -55,6 +60,11 @@ namespace PotholeApi.Repositories
             {
                 _context.RepairTeams.Remove(repairTeam);
                 await _context.SaveChangesAsync();
+                _logger.LogInformation("Deleted repair team {RepairTeamId}", id);
+            }
+            else
+            {
+                _logger.LogWarning("DeleteAsync: repair team {RepairTeamId} not found", id);
             }
         }
         public async Task DoesExist(int id)
@@ -62,6 +72,7 @@ namespace PotholeApi.Repositories
             var exists = await _context.RepairTeams.AnyAsync(rt => rt.Id == id);
             if (!exists)
             {
+                _logger.LogWarning("DoesExist: repair team {RepairTeamId} does not exist", id);
                 throw new KeyNotFoundException($"RepairTeam with ID {id} does not exist.");
             }
         }

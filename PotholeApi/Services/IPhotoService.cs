@@ -7,6 +7,7 @@ namespace PotholeApi.Services
 
         public Task<ImageUploadResult> UploadPhotoWithResultAsync(IFormFile file);
         public Task<DeletionResult> DeletePhotoAsync(string publicId);
+        public Task<ImageUploadResult> UploadPhotoWithResultAsBytesAsync(byte[] ImageByts);
 
     }
 }

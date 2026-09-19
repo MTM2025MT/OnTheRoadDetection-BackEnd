@@ -1,5 +1,6 @@
 ﻿using Microsoft.AspNetCore.Identity;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Logging;
 using PotholeApi.IRepositories;
 using PotholeApi.Models;
 using System;
@@ -10,11 +11,13 @@ namespace PotholeApi.Repositories
     {
         private readonly Context _context;
         private readonly UserManager<ApplicationUser> _userManager;
+        private readonly ILogger<OfficerRepository> _logger;
 
-        public OfficerRepository(Context context,UserManager<ApplicationUser> userManager)
+        public OfficerRepository(Context context, UserManager<ApplicationUser> userManager, ILogger<OfficerRepository> logger)
         {
             _context = context;
             _userManager = userManager;
+            _logger = logger;
         }
 
         public async Task<ICollection<Officer>> GetAllAsync()
@@ -40,15 +43,17 @@ namespace PotholeApi.Repositories
         }
 
         public async Task AddAsync(Officer officer)
-        {      
+        {
             await _context.Officers.AddAsync(officer);
             await _context.SaveChangesAsync();
+            _logger.LogInformation("Created officer {OfficerId}", officer.Id);
         }
 
         public async Task UpdateAsync(Officer officer)
         {
             _context.Officers.Update(officer);
             await _context.SaveChangesAsync();
+            _logger.LogInformation("Updated officer {OfficerId}", officer.Id);
         }
 
         public async Task DeleteAsync(int id)
@@ -58,6 +63,11 @@ namespace PotholeApi.Repositories
             {
                 _context.Officers.Remove(officer);
                 await _context.SaveChangesAsync();
+                _logger.LogInformation("Deleted officer {OfficerId}", id);
+            }
+            else
+            {
+                _logger.LogWarning("DeleteAsync: officer {OfficerId} not found", id);
             }
         }
         public async Task DoesExist(int id)
@@ -65,6 +75,7 @@ namespace PotholeApi.Repositories
             var exists = await _context.Officers.AnyAsync(o => o.Id == id);
             if (!exists)
             {
+                _logger.LogWarning("DoesExist: officer {OfficerId} does not exist", id);
                 throw new Exception($"Officer with ID {id} does not exist.");
             }
         }
@@ -74,6 +85,7 @@ namespace PotholeApi.Repositories
                                         .FirstOrDefaultAsync(o => o.ApplicationUser.Id == userId);
             if (officer == null)
             {
+                _logger.LogWarning("GetOfficerByUserIdAsync: no officer for user {UserId}", userId);
                 throw new Exception($"Officer with User ID {userId} does not exist.");
             }
             return officer;

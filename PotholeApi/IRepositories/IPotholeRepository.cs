@@ -1,5 +1,6 @@
 ﻿using System.Collections.ObjectModel;
 using PotholeApi.Models;
+using static PotholeApi.Models.Enums;
 namespace PotholeApi.IRepositories
 {
     public interface IPotholeRepository
@@ -13,5 +14,6 @@ namespace PotholeApi.IRepositories
         public Task<ICollection<Pothole>> GetPotholesByDistrictIdAsync(int districtId);
         public  Task<ICollection<Pothole>> GetPotholesByNeighbourhoodIdAsync(int neighbourhoodId);
         public Task DoesExist(int id);
+        public Task<ICollection<Pothole>> GetPotholesByFilterAsync(RepairStatus? status, Level? severity);
     }
 }

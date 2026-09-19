@@ -1,19 +1,23 @@
 ﻿using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Logging;
 using NetTopologySuite;
 using NetTopologySuite.Geometries;
 using PotholeApi.IRepositories;
 using PotholeApi.Models;
 using System.Collections.ObjectModel;
+using static PotholeApi.Models.Enums;
 
 namespace PotholeApi.Repositories
 {
     public class PotholeRepository : IPotholeRepository
     {
         private readonly Context _context;
+        private readonly ILogger<PotholeRepository> _logger;
 
-        public PotholeRepository(Context context)
+        public PotholeRepository(Context context, ILogger<PotholeRepository> logger)
         {
             _context = context;
+            _logger = logger;
         }
 
         public async Task<Pothole> CreatePotholeAsync(Pothole pothole)
@@ -21,6 +25,7 @@ namespace PotholeApi.Repositories
             // FIX: If Latitude/Longitude properties are gone, we MUST require Location here.
             if (pothole.Location == null)
             {
+                _logger.LogWarning("CreatePotholeAsync called without a Location");
                 throw new ArgumentException("Pothole Location (Point) is required.");
             }
 
@@ -44,6 +49,7 @@ namespace PotholeApi.Repositories
 
             await _context.Potholes.AddAsync(pothole);
             await _context.SaveChangesAsync();
+            _logger.LogInformation("Created pothole {PotholeId} in neighbourhood {NeighbourhoodId}", pothole.Id, pothole.NeighbourhoodId);
             return pothole;
         }
 
@@ -52,12 +58,14 @@ namespace PotholeApi.Repositories
             var potholeToUpdate = await _context.Potholes.FindAsync(id);
             if (potholeToUpdate == null)
             {
+                _logger.LogWarning("UpdatePotholeAsync: pothole {PotholeId} not found", id);
                 return null;
             }
 
             potholeToUpdate.Description = pothole.Description;
             potholeToUpdate.ImageUrl = pothole.ImageUrl;
             potholeToUpdate.LevelOfSeverity = pothole.LevelOfSeverity;
+            potholeToUpdate.Status = pothole.Status;
 
             // FIX: Only update Location if the new one is valid and different
             if (pothole.Location != null && !pothole.Location.Equals(potholeToUpdate.Location))
@@ -76,6 +84,7 @@ namespace PotholeApi.Repositories
             }
 
             await _context.SaveChangesAsync();
+            _logger.LogInformation("Updated pothole {PotholeId}", id);
             return potholeToUpdate;
         }
 
@@ -115,10 +124,15 @@ namespace PotholeApi.Repositories
         public async Task<bool> DeletePotholeAsync(int id)
         {
             var pothole = await _context.Potholes.FindAsync(id);
-            if (pothole == null) return false;
+            if (pothole == null)
+            {
+                _logger.LogWarning("DeletePotholeAsync: pothole {PotholeId} not found", id);
+                return false;
+            }
 
             _context.Potholes.Remove(pothole);
             await _context.SaveChangesAsync();
+            _logger.LogInformation("Deleted pothole {PotholeId}", id);
             return true;
         }
 
@@ -151,8 +165,26 @@ namespace PotholeApi.Repositories
         {
             if (!await _context.Potholes.AnyAsync(p => p.Id == id))
             {
+                _logger.LogWarning("DoesExist: pothole {PotholeId} does not exist", id);
                 throw new KeyNotFoundException($"Pothole with ID {id} does not exist.");
             }
+        }
+
+        public async Task<ICollection<Pothole>> GetPotholesByFilterAsync(RepairStatus? status, Level? severity)
+        {
+            var query = _context.Potholes.AsQueryable();
+
+            if (status.HasValue)
+            {
+                query = query.Where(p => p.Status == status.Value);
+            }
+
+            if (severity.HasValue)
+            {
+                query = query.Where(p => p.LevelOfSeverity == severity.Value);
+            }
+
+            return await query.ToListAsync();
         }
     }
 }

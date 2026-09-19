@@ -1,4 +1,5 @@
 ﻿using Microsoft.AspNetCore.Mvc;
+using Microsoft.Extensions.Logging;
 using PotholeApi.IRepositories;
 using PotholeApi.Models;
 using System.Collections.Generic;
@@ -11,11 +12,13 @@ namespace PotholeApi.Controllers
     public class DistrictController : ControllerBase
     {
         private readonly IDistrictRepository _repository;
+        private readonly ILogger<DistrictController> _logger;
 
         // Inject the Repository, NOT the Context
-        public DistrictController(IDistrictRepository repository)
+        public DistrictController(IDistrictRepository repository, ILogger<DistrictController> logger)
         {
             _repository = repository;
+            _logger = logger;
         }
 
         // GET: api/districts/5
@@ -26,6 +29,7 @@ namespace PotholeApi.Controllers
 
             if (district == null)
             {
+                _logger.LogWarning("GetDistrict: district {DistrictId} not found", id);
                 return NotFound();
             }
 

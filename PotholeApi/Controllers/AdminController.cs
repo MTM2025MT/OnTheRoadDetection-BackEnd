@@ -3,6 +3,7 @@ using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Logging;
 using PotholeApi.DTO;
 using PotholeApi.Models;
 using PotholeApi.Services;
@@ -14,19 +15,21 @@ namespace PotholeApi.Controllers
     [ApiController]
     public class AdminController : ControllerBase
     {
-        
+
         private readonly ISeedRoleAdminServices _seedRoleAdminServices;
         private readonly RoleManager<IdentityRole> _roleManager;
         private readonly UserManager<ApplicationUser> _userManager;
         private readonly Context _context;
         private readonly IEnumerable<IRoleHandler> _roleHandlers;
-        public AdminController(IEnumerable<IRoleHandler> roleHandlers, Context context,ISeedRoleAdminServices seedRoleAdminServices,RoleManager<IdentityRole> RoleManager,UserManager<ApplicationUser> UserManager)
+        private readonly ILogger<AdminController> _logger;
+        public AdminController(IEnumerable<IRoleHandler> roleHandlers, Context context,ISeedRoleAdminServices seedRoleAdminServices,RoleManager<IdentityRole> RoleManager,UserManager<ApplicationUser> UserManager, ILogger<AdminController> logger)
         {
             _seedRoleAdminServices = seedRoleAdminServices;
             _roleManager = RoleManager;
             _userManager = UserManager;
             _context = context;
             _roleHandlers = roleHandlers;
+            _logger = logger;
         }
         [HttpPost("CreateRole")]
         public async Task<IActionResult> CreateRole([FromBody] RoleCreateDto roleDto)
@@ -40,21 +43,24 @@ namespace PotholeApi.Controllers
 
             if (roleExists)
             {
+                _logger.LogWarning("CreateRole: role {RoleName} already exists", roleDto.RoleName);
                 return BadRequest($"Role '{roleDto.RoleName}' already exists.");
             }
 
-            
+
             // 3. Async Create: Use await here
             var result = await _seedRoleAdminServices.CreateRoleAsync(roleDto.RoleName);
 
             var isThereHandlerForThisRole = _roleHandlers.Any(h => h.RoleName == roleDto.RoleName);
             if (isThereHandlerForThisRole) {
+                _logger.LogWarning("CreateRole: role {RoleName} has a dedicated handler, refusing generic creation", roleDto.RoleName);
                 return BadRequest($"Role '{roleDto.RoleName}' cannot be created because it has a specific handler. Please use the appropriate endpoint for that role.");
             }
             // Optional: Check if the service actually succeeded
             // (Assuming your service returns a boolean or IdentityResult)
             // if (!result.Succeeded) return BadRequest("Could not create role.");
 
+            _logger.LogInformation("Created role {RoleName}", roleDto.RoleName);
             return Ok($"Role '{roleDto.RoleName}' created successfully.");
         }
         [HttpGet("GetAllRoles")]
@@ -66,7 +72,7 @@ namespace PotholeApi.Controllers
             {
                 return NotFound("No roles found.");
             }
-            
+
             return Ok(roles);
         }
         [HttpDelete("DeleteRole")]
@@ -75,8 +81,10 @@ namespace PotholeApi.Controllers
             var result =  _seedRoleAdminServices.DeleteRoleAsync(roleName).Result;
             if (!result)
             {
+                _logger.LogWarning("DeleteRole: role {RoleName} not found", roleName);
                 return NotFound($"Role '{roleName}' not found.");
             }
+            _logger.LogInformation("Deleted role {RoleName}", roleName);
             return Ok($"Role '{roleName}' deleted successfully.");
         }
         //[HttpPost("AssignRoleToUser")]
@@ -167,11 +175,13 @@ namespace PotholeApi.Controllers
                 }
 
                 await transaction.CommitAsync();
+                _logger.LogInformation("Assigned role {RoleName} to user {UserId}", targetRole, dto.UserId);
                 return Ok($"{targetRole} assigned and profile created.");
             }
             catch (Exception ex)
             {
                 await transaction.RollbackAsync();
+                _logger.LogError(ex, "AssignRole: failed to assign role {RoleName} to user {UserId}", targetRole, dto.UserId);
                 return BadRequest(ex.Message);
             }
         }

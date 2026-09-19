@@ -45,6 +45,9 @@ namespace PotholeApi
                 entity.Property(p => p.Location)
                       .HasColumnType("geography");
 
+                entity.Property(p => p.Status)
+                      .HasDefaultValue(RepairStatus.Pending);
+
             });
             modelBuilder.Entity<Neighbourhood>()
             .Property(n => n.Geometry)

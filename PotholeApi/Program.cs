@@ -15,11 +15,25 @@ using PotholeApi.Repositories;
 using PotholeApi.Services;
 using PotholeApi.Services.DashboardsServices;
 using PotholeApi.Services.RoleHandlers;
+using Serilog;
 using System;
 using System.Text;
 using System.Text.Json.Serialization;
 
+Log.Logger = new LoggerConfiguration()
+    .WriteTo.Console()
+    .CreateBootstrapLogger();
+
+try
+{
+    Log.Information("Starting PotholeApi");
+
 var builder = WebApplication.CreateBuilder(args);
+
+builder.Host.UseSerilog((context, services, configuration) => configuration
+    .ReadFrom.Configuration(context.Configuration)
+    .ReadFrom.Services(services)
+    .Enrich.FromLogContext());
 
 // Add services to the container.
 /*
@@ -45,7 +59,7 @@ builder.Services.AddScoped<IRepairTeamRepository, RepairTeamRepository>();
 builder.Services.AddScoped<IOfficerRepository, OfficerRepository>();
 builder.Services.AddScoped<IJobTaskRepository, JobTaskRepository>();
 builder.Services.Configure<CloudinarySettings>(builder.Configuration.GetSection("CloudinarySettings"));
-builder.Services.AddScoped<IPhotoService, PotholeApi.Services.PhotoService>();
+builder.Services.AddScoped<IPhotoService, PhotoService>();
 builder.Services.AddScoped<IDistrictRepository,DistrictRepository>();
 builder.Services.AddScoped<INeighbourhoodRepository, NeighbourhoodRepository>();
 builder.Services.AddScoped<ISeedRoleAdminServices, SeedRoleAdminServices>();
@@ -75,7 +89,7 @@ builder.Services.AddAuthentication(options =>
     options.DefaultChallengeScheme = JwtBearerDefaults.AuthenticationScheme;
     options.DefaultScheme = JwtBearerDefaults.AuthenticationScheme;
 })
-// This is the part you were missing:
+
 .AddJwtBearer(options =>
 {
     options.SaveToken = true;
@@ -106,7 +120,7 @@ builder.Services.AddCors(options =>
     {
         policy
             .WithOrigins("http://localhost:5173") // <--- REPLACE THIS with your React URL
-            .AllowAnyMethod()
+            .AllowAnyMethod()   
             .AllowAnyHeader()
             .AllowCredentials(); // <--- This is REQUIRED for cookies to work
     });
@@ -114,6 +128,28 @@ builder.Services.AddCors(options =>
 
 var app = builder.Build();
 app.MapGrpcService<DetectionImplementationService>();
+
+app.UseSerilogRequestLogging();
+
+app.UseSwagger();
+    app.UseSwaggerUI();
+if (app.Environment.IsDevelopment())
+{
+}
+
+app.UseHttpsRedirection();
+
+app.UseCors("CorsPolicy");
+
+app.UseAuthentication();
+
+app.UseAuthorization();
+
+app.MapControllers();
+
+app.Run();
+
+
 //using (var scope = app.Services.CreateScope())
 //{
 //    var services = scope.ServiceProvider;
@@ -145,18 +181,12 @@ app.MapGrpcService<DetectionImplementationService>();
 //    }
 //}
 // Configure the HTTP request pipeline.
-app.UseSwagger();
-    app.UseSwaggerUI();
-if (app.Environment.IsDevelopment())
-{
 }
-
-app.UseHttpsRedirection();
-
-app.UseCors("CorsPolicy");
-
-app.UseAuthorization();
-
-app.MapControllers();
-
-app.Run();
+catch (Exception ex)
+{
+    Log.Fatal(ex, "PotholeApi terminated unexpectedly");
+}
+finally
+{
+    Log.CloseAndFlush();
+}

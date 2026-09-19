@@ -1,8 +1,10 @@
 ﻿using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.Extensions.Logging;
 using PotholeApi.Models;
 using PotholeApi.DTO;
 using PotholeApi.IRepositories;
+using System.Threading.Tasks;
 namespace PotholeApi.Controllers
 {
     [Route("api/[controller]")]
@@ -10,9 +12,11 @@ namespace PotholeApi.Controllers
     public class JobTaskController : ControllerBase
     {
         private IJobTaskRepository _jobTaskRepository;
-        public JobTaskController(IJobTaskRepository jobTaskRepository)
+        private readonly ILogger<JobTaskController> _logger;
+        public JobTaskController(IJobTaskRepository jobTaskRepository, ILogger<JobTaskController> logger)
         {
             _jobTaskRepository = jobTaskRepository;
+            _logger = logger;
         }
         [HttpGet("{id}")]
         public IActionResult GetJobTask(int id)
@@ -22,12 +26,14 @@ namespace PotholeApi.Controllers
                 var jobTask = _jobTaskRepository.GetByIdAsync(id).Result;
                 if (jobTask == null)
                 {
+                    _logger.LogWarning("GetJobTask: job task {JobTaskId} not found", id);
                     return NotFound();
                 }
                 return Ok(jobTask);
             }
             catch (Exception ex)
             {
+                _logger.LogError(ex, "GetJobTask: error fetching job task {JobTaskId}", id);
                 return StatusCode(500, "Internal server error: " + ex.Message);
             }
 
@@ -43,12 +49,13 @@ namespace PotholeApi.Controllers
             }
             catch (Exception ex)
             {
+                _logger.LogError(ex, "GetAllJobTasks: error fetching job tasks");
                 return StatusCode(500, "Internal server error: " + ex.Message);
             }
         }
 
         [HttpPost]
-        public IActionResult CreateJobTask([FromBody] JobTaskcreate JobTaskcreate)
+        public async Task<IActionResult> CreateJobTask([FromBody] JobTaskcreate JobTaskcreate)
         {
             try
             {
@@ -78,11 +85,12 @@ namespace PotholeApi.Controllers
                     Priority = JobTaskcreate.Priority,
                     Budget = JobTaskcreate.Budget,
                 };
-                var createdJobTask = _jobTaskRepository.AddAsync(jobTask);
+                var createdJobTask = await _jobTaskRepository.AddAsync(jobTask);
                 return CreatedAtAction(nameof(GetJobTask), new { id = createdJobTask.Id }, createdJobTask);
             }
             catch (Exception ex)
             {
+                _logger.LogError(ex, "CreateJobTask: error creating job task for pothole {PotholeId}", JobTaskcreate.PotholeId);
                 return StatusCode(500, "Internal server error: " + ex.Message);
             }
         }
@@ -95,6 +103,7 @@ namespace PotholeApi.Controllers
                 var existingJobTask = _jobTaskRepository.GetByIdAsync(id).Result;
                 if (existingJobTask == null)
                 {
+                    _logger.LogWarning("DeleteJobTask: job task {JobTaskId} not found", id);
                     return NotFound();
                 }
                 _jobTaskRepository.DeleteAsync(id);
@@ -102,6 +111,7 @@ namespace PotholeApi.Controllers
             }
             catch (Exception ex)
             {
+                _logger.LogError(ex, "DeleteJobTask: error deleting job task {JobTaskId}", id);
                 return StatusCode(500, "Internal server error: " + ex.Message);
             }
         }
@@ -118,6 +128,7 @@ namespace PotholeApi.Controllers
                 var existingJobTask = _jobTaskRepository.GetByIdAsync(id).Result;
                 if (existingJobTask == null)
                 {
+                    _logger.LogWarning("UpdateJobTask: job task {JobTaskId} not found", id);
                     return NotFound();
                 }
                 jobTask.Id = id;
@@ -126,6 +137,7 @@ namespace PotholeApi.Controllers
             }
             catch (Exception ex)
             {
+                _logger.LogError(ex, "UpdateJobTask: error updating job task {JobTaskId}", id);
                 return StatusCode(500, "Internal server error: " + ex.Message);
             }
         }
