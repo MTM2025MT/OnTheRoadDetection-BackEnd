@@ -7,7 +7,7 @@ namespace PotholeApi.IRepositories
     {
         public Task<ICollection<Pothole>> GetAllPotholesAsync();
         public Task<Pothole?> GetPotholeByIdAsync(int id);
-        public Task<ICollection<Pothole>> GetPotholesbyRange(double First_Latitude, double First_Longitude, double Second_Latitude, double Second_Longitude);
+        public Task<ICollection<Pothole>> GetPotholesByRange(double firstLatitude, double firstLongitude, double secondLatitude, double secondLongitude);
         public Task<Pothole> CreatePotholeAsync(Pothole pothole);
         public Task<Pothole?> UpdatePotholeAsync(int id, Pothole pothole);
         public Task<bool> DeletePotholeAsync(int id);

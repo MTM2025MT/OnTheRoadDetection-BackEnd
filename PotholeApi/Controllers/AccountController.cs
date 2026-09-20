@@ -17,20 +17,10 @@ namespace PotholeApi.Controllers
     [Route("api/[controller]")]
     [ApiController]
     public class AccountController : ControllerBase
-
     {
-        //private readonly Context _context;
-
-        //public AccountController(Context context)
-        //{
-        //    _context = context;
-        //}
-
-
         private readonly UserManager<ApplicationUser> _userManager;
         private readonly IConfiguration _configuration;
         private readonly Context _context;
-        // --- NEW: Inject ISeedRoleAdminServices ---
         private readonly RoleManager<IdentityRole> _roleManager;
         private readonly ILogger<AccountController> _logger;
         public AccountController(Context context, UserManager<ApplicationUser> userManager, IConfiguration configuration, RoleManager<IdentityRole> roleManager, ILogger<AccountController> logger)
@@ -42,23 +32,23 @@ namespace PotholeApi.Controllers
             _logger = logger;
         }
         [HttpPost("Register")]
-        public async Task<IActionResult> Register(RegisterDto RegisterDto)
+        public async Task<IActionResult> Register(RegisterDto registerDto)
         {
             if (!ModelState.IsValid)
             {
-                _logger.LogWarning("Register: invalid model state for {UserName}", RegisterDto?.UserName);
+                _logger.LogWarning("Register: invalid model state for {UserName}", registerDto?.UserName);
                 return BadRequest(ModelState);
             }
 
             var newUser = new ApplicationUser
             {
-                UserName = RegisterDto.UserName,
-                Email = RegisterDto.Email,
-                FirstName = RegisterDto.FirstName,
-                LastName = RegisterDto.LastName
+                UserName = registerDto.UserName,
+                Email = registerDto.Email,
+                FirstName = registerDto.FirstName,
+                LastName = registerDto.LastName
             };
 
-            IdentityResult result = await _userManager.CreateAsync(newUser, RegisterDto.Password);
+            IdentityResult result = await _userManager.CreateAsync(newUser, registerDto.Password);
             // Registration logic here
             if (result.Succeeded)
             {
@@ -116,7 +106,7 @@ namespace PotholeApi.Controllers
 
                 return Ok("created");
             }
-            _logger.LogWarning("Register: identity errors for {UserName}: {Errors}", RegisterDto.UserName, string.Join(", ", result.Errors.Select(e => e.Code)));
+            _logger.LogWarning("Register: identity errors for {UserName}: {Errors}", registerDto.UserName, string.Join(", ", result.Errors.Select(e => e.Code)));
             foreach (var err in result.Errors)
             {
                 if (err.Code.Contains("Password"))
@@ -179,7 +169,7 @@ namespace PotholeApi.Controllers
             }
             else
             {
-                claims.Add(new Claim(ClaimTypes.Name, user.UserName));
+                claims.Add(new Claim(ClaimTypes.Name, user.UserName ?? user.Id));
             }
             claims.Add(new Claim(ClaimTypes.NameIdentifier, user.Id));
 
@@ -192,9 +182,9 @@ namespace PotholeApi.Controllers
             _logger.LogDebug("Login: user {UserId} authenticated with roles [{Roles}]", user.Id, string.Join(", ", userRoles2));
 
             // 2. Generate Access Token (JWT)
-            var secretkey = _configuration["JWT:Secret"];
-            var signkey = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(secretkey));
-            var credentials = new SigningCredentials(signkey, SecurityAlgorithms.HmacSha256);
+            var secretKey = _configuration["JWT:Secret"] ?? throw new InvalidOperationException("JWT:Secret is not configured.");
+            var signKey = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(secretKey));
+            var credentials = new SigningCredentials(signKey, SecurityAlgorithms.HmacSha256);
 
             var myIssuer = "PotholeServer";
             var myAudience = "PotholeReactApp";
@@ -337,20 +327,20 @@ namespace PotholeApi.Controllers
             // 4. Generate a NEW Access Token
             var claims = new List<Claim>
     {
-        new Claim(ClaimTypes.Name, user.UserName),
+        new Claim(ClaimTypes.Name, user.UserName ?? user.Id),
         new Claim(ClaimTypes.NameIdentifier, user.Id)
         // Add roles again here...
     };
 
-            var secretkey = _configuration["JWT:Secret"];
-            var signkey = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(secretkey));
+            var secretKey = _configuration["JWT:Secret"] ?? throw new InvalidOperationException("JWT:Secret is not configured.");
+            var signKey = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(secretKey));
             var tokenDescriptor = new SecurityTokenDescriptor
             {
                 Issuer = "PotholeServer",
                 Audience = "PotholeReactApp",
                 Subject = new ClaimsIdentity(claims),
                 Expires = DateTime.UtcNow.AddMinutes(15), // New 15 min life
-                SigningCredentials = new SigningCredentials(signkey, SecurityAlgorithms.HmacSha256)
+                SigningCredentials = new SigningCredentials(signKey, SecurityAlgorithms.HmacSha256)
             };
 
             var tokenHandler = new JwtSecurityTokenHandler();

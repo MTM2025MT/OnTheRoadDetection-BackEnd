@@ -33,14 +33,14 @@ namespace PotholeApi.Services.RoleHandlers
                 throw new InvalidOperationException("Invalid DTO for Manager");
 
             // 2. Locate the Identity user
-            var user = await _userManager.FindByIdAsync(managerDto.UserId.ToString());
+            var user = await _userManager.FindByIdAsync(managerDto.UserId);
             if (user == null)
                 throw new InvalidOperationException($"User with id '{managerDto.UserId}' not found.");
 
             // 3. Check if user already has this role
             if (await _userManager.IsInRoleAsync(user, RoleName))
             {
-                throw new Exception($"User is already in the {RoleName} role.");
+                throw new InvalidOperationException($"User is already in the {RoleName} role.");
             }
 
             // 4. Ensure the role exists in the database

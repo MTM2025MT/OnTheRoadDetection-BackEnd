@@ -2,12 +2,10 @@
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.Extensions.Logging;
-using NetTopologySuite;
 using NetTopologySuite.Geometries;
 using PotholeApi.DTO;
 using PotholeApi.IRepositories;
 using PotholeApi.Models;
-using PotholeApi.Repositories;
 using PotholeApi.Services;
 using PotholeApi.Services.DashboardsServices;
 using System.Security.Claims;
@@ -36,11 +34,11 @@ namespace PotholeApi.Controllers
             _logger = logger;
         }
         [HttpGet("{id}")]
-        public IActionResult GetPothole(int id)
+        public async Task<IActionResult> GetPothole(int id)
         {
             try
             {
-                var pothole = _potholeRepository.GetPotholeByIdAsync(id).Result;
+                var pothole = await _potholeRepository.GetPotholeByIdAsync(id);
                 if (pothole == null)
                 {
                     _logger.LogWarning("GetPothole: pothole {PotholeId} not found", id);
@@ -55,12 +53,12 @@ namespace PotholeApi.Controllers
             }
         }
         [HttpGet("GetAll")]
-        public IActionResult GetAllPotholes()
+        public async Task<IActionResult> GetAllPotholes()
         {
             try
             {
-                var Potholes = _potholeRepository.GetAllPotholesAsync().Result;
-                return Ok(Potholes);
+                var potholes = await _potholeRepository.GetAllPotholesAsync();
+                return Ok(potholes);
             }
             catch (Exception ex)
             {
@@ -82,9 +80,9 @@ namespace PotholeApi.Controllers
                 {
                     return BadRequest("All bounds parameters are required and must be non-zero.");
                 }
-                var Potholes = await _potholeRepository.GetPotholesbyRange(first_latitude, first_longitude, second_latitude, second_longitude);
+                var potholes = await _potholeRepository.GetPotholesByRange(first_latitude, first_longitude, second_latitude, second_longitude);
 
-                return Ok(Potholes);
+                return Ok(potholes);
             }
             catch (Exception ex)
             {
@@ -95,7 +93,7 @@ namespace PotholeApi.Controllers
         }
 
         [HttpPost]
-        public async Task<IActionResult> CreatePothole([FromForm] CreatePotholePost Recivedpothole)
+        public async Task<IActionResult> CreatePothole([FromForm] CreatePotholePost request)
         {
             if (!ModelState.IsValid)
             {
@@ -104,25 +102,25 @@ namespace PotholeApi.Controllers
             try
             {
                 string imageUrl = "";
-                if (Recivedpothole.Photo != null)
+                if (request.Photo != null)
                 {
-                    var photoResult = await _photoService.UploadPhotoWithResultAsync(Recivedpothole.Photo);
+                    var photoResult = await _photoService.UploadPhotoWithResultAsync(request.Photo);
                     imageUrl = photoResult.Url.ToString();
 
                 }
-                var location = new Point(Recivedpothole.Longitude, Recivedpothole.Latitude) { SRID = 4326 };
+                var location = new Point(request.Longitude, request.Latitude) { SRID = 4326 };
                 var newPothole = new Pothole
                 {
-                   Location = location,
-                    Description = Recivedpothole.Description,
+                    Location = location,
+                    Description = request.Description,
                     ReportedAt = DateTime.UtcNow,
                     ImageUrl = imageUrl,
                     LevelOfSeverity = Enums.Level.Medium
 
                 };
-                var potholeitem = _potholeRepository.CreatePotholeAsync(newPothole).Result;
-                _logger.LogInformation("Created pothole {PotholeId} via manual report", potholeitem.Id);
-                return StatusCode(201, potholeitem);
+                var potholeItem = await _potholeRepository.CreatePotholeAsync(newPothole);
+                _logger.LogInformation("Created pothole {PotholeId} via manual report", potholeItem.Id);
+                return StatusCode(201, potholeItem);
             }
             catch (Exception ex)
             {
@@ -132,10 +130,9 @@ namespace PotholeApi.Controllers
 
         }
 
-        // Bu metodu CreateWithFotoAsUrl'nin altına veya sınıfın içine bir yere yapıştır
+        // Strips a data-URI prefix ("data:image/jpeg;base64,") if present before decoding.
         private IFormFile ConvertBase64ToFormFile(string base64String, string fileName)
         {
-            // Base64 başlıklarını temizle (varsa) örn: "data:image/jpeg;base64,"
             if (base64String.Contains(","))
             {
                 base64String = base64String.Split(',')[1];
@@ -144,11 +141,10 @@ namespace PotholeApi.Controllers
             byte[] bytes = Convert.FromBase64String(base64String);
             var stream = new MemoryStream(bytes);
 
-            // FormFile oluşturuyoruz
             var file = new FormFile(stream, 0, bytes.Length, "image_file", fileName)
             {
                 Headers = new HeaderDictionary(),
-                ContentType = "image/jpeg" // Resim formatına göre değişebilir
+                ContentType = "image/jpeg"
             };
 
             return file;
@@ -164,59 +160,28 @@ namespace PotholeApi.Controllers
 
             try
             {
-                //#region creatingBonderyBoxForPothole
-                //var geometryFactory = NtsGeometryServices.Instance.CreateGeometryFactory(srid: 4326);
-                //var coordinates = receivedJson.BoundingBox?
-                // .Select(pointArray => new Coordinate(pointArray[0], pointArray[1]))
-                //    .ToList();
-                //if (coordinates?.Count < 3)
-                //{
-                //    return BadRequest("A pothole boundary must have at least 3 points.");
-                //}
-                //if (!coordinates.First().Equals2D(coordinates.Last()))
-                //{
-                //    coordinates.Add(coordinates.First());
-                //}
-
-                //// 5. Create the Polygon
-                //var potholePolygon = geometryFactory.CreatePolygon(coordinates.ToArray());
-
-                //#endregion
-
                 string finalImageUrl = "";
                 if (!string.IsNullOrEmpty(receivedJson.ImageBase64))
                 {
-                    // 1. Base64 string'i IFormFile'a çeviriyoruz
                     var formFile = ConvertBase64ToFormFile(receivedJson.ImageBase64, "upload.jpg");
                     if (formFile == null)
                     {
                         return BadRequest("Failed to process image. The Base64 string is invalid or corrupted.");
                     }
-                    // 2. Artık elinde IFormFile var, servise gönderebilirsin
                     var photoResult = await _photoService.UploadPhotoWithResultAsync(formFile);
 
-                    // 3. Cloudinary/Servis'ten dönen gerçek URL'i alıyoruz
                     if (photoResult.Url != null)
                     {
                         finalImageUrl = photoResult.Url.ToString();
                     }
                 }
-                // 3. Map the data from the JSON to your database entity  MatchedGps
                 var location = new Point(receivedJson.MatchedGps.Longitude, receivedJson.MatchedGps.Latitude) { SRID = 4326 };
                 var newPothole = new Pothole
                 {
-                    // Get coordinates from the nested "matched_gps" object
                     Location = location,
-
-                    // The JSON doesn't have a description, so we add a default one or leave it empty
                     Description = $"AI Detection (Confidence: {receivedJson.Confidence})",
-
-                    // Get the date from the nested "createdAt" object (or use DateTime.UtcNow)
                     ReportedAt = DateTime.UtcNow,
-
-                    // The JSON already contains the URL in "_stored_file", so we don't need to upload it again
                     ImageUrl = finalImageUrl,
-
                     LevelOfSeverity = receivedJson.LevelOfSeverity switch
                     {
                         >= 7 => Enums.Level.High,
@@ -225,7 +190,6 @@ namespace PotholeApi.Controllers
                     }
                 };
 
-                // 4. Use 'await' here. Do not use '.Result' (it freezes the server)
                 var potholeItem = await _potholeRepository.CreatePotholeAsync(newPothole);
 
                 _logger.LogInformation("Created pothole {PotholeId} from AI detection (confidence {Confidence})", potholeItem.Id, receivedJson.Confidence);
@@ -244,14 +208,17 @@ namespace PotholeApi.Controllers
         {
             try
             {
-                var existingPothole = _potholeRepository.GetPotholeByIdAsync(id).Result;
+                var existingPothole = await _potholeRepository.GetPotholeByIdAsync(id);
                 if (existingPothole == null)
                 {
                     _logger.LogWarning("DeletePothole: pothole {PotholeId} not found", id);
                     return NotFound();
                 }
-                var photoDeletion = await _photoService.DeletePhotoAsync(existingPothole.ImageUrl);
-                var result = _potholeRepository.DeletePotholeAsync(id).Result;
+                if (!string.IsNullOrEmpty(existingPothole.ImageUrl))
+                {
+                    await _photoService.DeletePhotoAsync(existingPothole.ImageUrl);
+                }
+                var result = await _potholeRepository.DeletePotholeAsync(id);
                 if (!result)
                 {
                     return NotFound();
@@ -270,7 +237,7 @@ namespace PotholeApi.Controllers
 
 
         [HttpPut("{id}")]
-        public IActionResult UpdatePothole(int id, [FromBody] Pothole pothole)
+        public async Task<IActionResult> UpdatePothole(int id, [FromBody] Pothole pothole)
         {
             if (!ModelState.IsValid)
             {
@@ -278,13 +245,13 @@ namespace PotholeApi.Controllers
             }
             try
             {
-                var existingPothole = _potholeRepository.GetPotholeByIdAsync(id).Result;
+                var existingPothole = await _potholeRepository.GetPotholeByIdAsync(id);
                 if (existingPothole == null)
                 {
                     _logger.LogWarning("UpdatePothole: pothole {PotholeId} not found", id);
                     return NotFound();
                 }
-                var updatedPothole = _potholeRepository.UpdatePotholeAsync(id, pothole).Result;
+                var updatedPothole = await _potholeRepository.UpdatePotholeAsync(id, pothole);
                 _logger.LogInformation("Updated pothole {PotholeId}", id);
                 return Ok(updatedPothole);
             }
@@ -382,10 +349,10 @@ namespace PotholeApi.Controllers
         }
 
         [HttpGet("DoesPotholeAssociatedWithAnyJobTask/{potholeId}")]
-        public async Task<bool> DoesPotholeAssociatedWithAnyJobTask(int potholeId)
+        public async Task<IActionResult> DoesPotholeAssociatedWithAnyJobTask(int potholeId)
         {
             var doesPotholeExistWithTask = await _jobTaskRepository.PotholeWithTaskExistAsync(potholeId);
-            return doesPotholeExistWithTask;
+            return Ok(doesPotholeExistWithTask);
         }
 
         [HttpGet("DashboardPotholeData")]

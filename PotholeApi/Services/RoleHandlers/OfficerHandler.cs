@@ -24,16 +24,15 @@ namespace PotholeApi.Services.RoleHandlers
             // 1. Cast the generic DTO to the specific one
             if (dto is not OfficerAssignmentDto officerDto)
                 throw new InvalidOperationException("Invalid DTO for Officer");
-            var user = await _userManager.FindByIdAsync(officerDto.UserId.ToString());
-            try
+
+            var user = await _userManager.FindByIdAsync(officerDto.UserId);
+            if (user == null)
+                throw new InvalidOperationException($"User with id '{officerDto.UserId}' not found.");
+
+            if (await _userManager.IsInRoleAsync(user, RoleName))
             {
-                
-            if(await _userManager.IsInRoleAsync(user, RoleName))
-            {
-                throw new Exception( "User is already in the Officer role.");
+                throw new InvalidOperationException("User is already in the Officer role.");
             }
-
-
 
             // Ensure the role exists
             if (!await _roleManager.RoleExistsAsync(RoleName))
@@ -42,35 +41,29 @@ namespace PotholeApi.Services.RoleHandlers
                 if (!createRoleResult.Succeeded)
                     throw new InvalidOperationException("Failed to create Officer role.");
             }
-            // Optionally persist any additional admin-specific data using _context here.
-            var addResult = await _userManager.AddToRoleAsync(user, RoleName);
 
+            var addResult = await _userManager.AddToRoleAsync(user, RoleName);
             if (!addResult.Succeeded)
             {
                 var errors = string.Join(", ", addResult.Errors.Select(e => e.Description));
                 throw new InvalidOperationException(errors);
             }
-                // 2. Run Officer-specific logic
-                if (_context.Officers.Any(o => o.ApplicationUserId == officerDto.UserId))
-                {
-                    throw new Exception("Officer record already exists for this user.");
-                }
-                var officer = new Officer
-                {
-                    ApplicationUser = await _userManager.FindByIdAsync(officerDto.UserId),
-                    BadgeNumber = officerDto.BadgeNumber, // We have access to this now!
-                    Rank = officerDto.Rank,
-                };
 
-                _context.Officers.Add(officer);
-
-                await _context.SaveChangesAsync();
-            }
-            catch (Exception ex)
+            // 2. Run Officer-specific logic
+            if (_context.Officers.Any(o => o.ApplicationUserId == officerDto.UserId))
             {
-                throw ex;
+                throw new InvalidOperationException("Officer record already exists for this user.");
             }
-            
+
+            var officer = new Officer
+            {
+                ApplicationUser = user,
+                BadgeNumber = officerDto.BadgeNumber,
+                Rank = officerDto.Rank,
+            };
+
+            _context.Officers.Add(officer);
+            await _context.SaveChangesAsync();
         }
     }
 }

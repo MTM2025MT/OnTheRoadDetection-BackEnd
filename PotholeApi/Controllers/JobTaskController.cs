@@ -1,5 +1,4 @@
-﻿using Microsoft.AspNetCore.Http;
-using Microsoft.AspNetCore.Mvc;
+﻿using Microsoft.AspNetCore.Mvc;
 using Microsoft.Extensions.Logging;
 using PotholeApi.Models;
 using PotholeApi.DTO;
@@ -19,11 +18,11 @@ namespace PotholeApi.Controllers
             _logger = logger;
         }
         [HttpGet("{id}")]
-        public IActionResult GetJobTask(int id)
+        public async Task<IActionResult> GetJobTask(int id)
         {
             try
             {
-                var jobTask = _jobTaskRepository.GetByIdAsync(id).Result;
+                var jobTask = await _jobTaskRepository.GetByIdAsync(id);
                 if (jobTask == null)
                 {
                     _logger.LogWarning("GetJobTask: job task {JobTaskId} not found", id);
@@ -40,11 +39,11 @@ namespace PotholeApi.Controllers
         }
 
         [HttpGet]
-        public IActionResult GetAllJobTasks()
+        public async Task<IActionResult> GetAllJobTasks()
         {
             try
             {
-                var jobTasks = _jobTaskRepository.GetAllAsync().Result;
+                var jobTasks = await _jobTaskRepository.GetAllAsync();
                 return Ok(jobTasks);
             }
             catch (Exception ex)
@@ -55,7 +54,7 @@ namespace PotholeApi.Controllers
         }
 
         [HttpPost]
-        public async Task<IActionResult> CreateJobTask([FromBody] JobTaskcreate JobTaskcreate)
+        public async Task<IActionResult> CreateJobTask([FromBody] JobTaskCreateDto request)
         {
             try
             {
@@ -75,38 +74,38 @@ namespace PotholeApi.Controllers
                         errors = errorMessages
                     });
                 }
-                 var jobTask = new JobTask
+                var jobTask = new JobTask
                 {
-                    PotholeId = JobTaskcreate.PotholeId,
-                    OfficerId = JobTaskcreate.OfficerId,
-                    RepairTeamId = JobTaskcreate.RepairTeamId,
+                    PotholeId = request.PotholeId,
+                    OfficerId = request.OfficerId,
+                    RepairTeamId = request.RepairTeamId,
                     AssignedAt = DateTime.UtcNow,
-                    Notes = JobTaskcreate.Notes,
-                    Priority = JobTaskcreate.Priority,
-                    Budget = JobTaskcreate.Budget,
+                    Notes = request.Notes,
+                    Priority = request.Priority,
+                    Budget = request.Budget,
                 };
                 var createdJobTask = await _jobTaskRepository.AddAsync(jobTask);
                 return CreatedAtAction(nameof(GetJobTask), new { id = createdJobTask.Id }, createdJobTask);
             }
             catch (Exception ex)
             {
-                _logger.LogError(ex, "CreateJobTask: error creating job task for pothole {PotholeId}", JobTaskcreate.PotholeId);
+                _logger.LogError(ex, "CreateJobTask: error creating job task for pothole {PotholeId}", request.PotholeId);
                 return StatusCode(500, "Internal server error: " + ex.Message);
             }
         }
 
         [HttpDelete("{id}")]
-        public IActionResult DeleteJobTask(int id)
+        public async Task<IActionResult> DeleteJobTask(int id)
         {
             try
             {
-                var existingJobTask = _jobTaskRepository.GetByIdAsync(id).Result;
+                var existingJobTask = await _jobTaskRepository.GetByIdAsync(id);
                 if (existingJobTask == null)
                 {
                     _logger.LogWarning("DeleteJobTask: job task {JobTaskId} not found", id);
                     return NotFound();
                 }
-                _jobTaskRepository.DeleteAsync(id);
+                await _jobTaskRepository.DeleteAsync(id);
                 return NoContent();
             }
             catch (Exception ex)
@@ -117,7 +116,7 @@ namespace PotholeApi.Controllers
         }
 
         [HttpPut("{id}")]
-        public IActionResult UpdateJobTask(int id, [FromBody] JobTask jobTask)
+        public async Task<IActionResult> UpdateJobTask(int id, [FromBody] JobTask jobTask)
         {
             try
             {
@@ -125,14 +124,14 @@ namespace PotholeApi.Controllers
                 {
                     return BadRequest(ModelState);
                 }
-                var existingJobTask = _jobTaskRepository.GetByIdAsync(id).Result;
+                var existingJobTask = await _jobTaskRepository.GetByIdAsync(id);
                 if (existingJobTask == null)
                 {
                     _logger.LogWarning("UpdateJobTask: job task {JobTaskId} not found", id);
                     return NotFound();
                 }
                 jobTask.Id = id;
-                _jobTaskRepository.UpdateAsync(jobTask);
+                await _jobTaskRepository.UpdateAsync(jobTask);
                 return NoContent();
             }
             catch (Exception ex)

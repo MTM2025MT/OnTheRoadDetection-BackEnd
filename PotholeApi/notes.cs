@@ -15,7 +15,6 @@
 -- i need to make service layer
 
 -- i think i need to make the ai rewirte the code is beautful way 
--- make filter for phothole like potholes? catagory=fixed 
 -- get the new requirements 
  some question are
 

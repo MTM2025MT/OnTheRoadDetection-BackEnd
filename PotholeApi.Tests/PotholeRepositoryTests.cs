@@ -181,7 +181,7 @@ namespace PotholeApi.Tests
         }
 
         [Fact]
-        public async Task GetPotholesbyRange_ReturnsPotholesWithinBBox()
+        public async Task GetPotholesByRange_ReturnsPotholesWithinBBox()
         {
             var dbName = Guid.NewGuid().ToString();
             using var ctx = TestHelpers.CreateContext(dbName);
@@ -197,7 +197,7 @@ namespace PotholeApi.Tests
             var repo = new PotholeRepository(ctx, NullLogger<PotholeRepository>.Instance);
 
             // Box from (0,0) to (2,2) should include p1 only
-            var results = await repo.GetPotholesbyRange(0, 0, 2, 2);
+            var results = await repo.GetPotholesByRange(0, 0, 2, 2);
 
             Assert.Single(results);
             Assert.Equal("In", results.First().Description);

@@ -1,7 +1,5 @@
-﻿using Microsoft.AspNetCore.Http;
-using Microsoft.AspNetCore.Mvc;
+﻿using Microsoft.AspNetCore.Mvc;
 using Microsoft.Extensions.Logging;
-using NetTopologySuite.Geometries;
 using PotholeApi.DTO;
 using PotholeApi.IRepositories;
 using PotholeApi.Models;
@@ -22,28 +20,23 @@ namespace PotholeApi.Controllers
         [HttpGet("{id}")]
         public async Task<IActionResult> GetNeighbourhoodById(int id)
         {
-            var Neighbourhood = await _repository.GetByIdAsync(id);
-            if (Neighbourhood == null)
+            var neighbourhood = await _repository.GetByIdAsync(id);
+            if (neighbourhood == null)
             {
                 _logger.LogWarning("GetNeighbourhoodById: neighbourhood {NeighbourhoodId} not found", id);
                 return NotFound();
             }
-            var neighbourhoodWithCentervalues = new NeighbourhoodWithCenterValues
+            var neighbourhoodWithCenterValues = new NeighbourhoodWithCenterValues
             {
-                Id = Neighbourhood.Id,
-                Name = Neighbourhood.Name,
-                DistrictId = Neighbourhood.DistrictId,
-                CenterLatitude = Neighbourhood.Geometry != null ? Neighbourhood.Geometry.Centroid.Y : 0,
-                CenterLongitude = Neighbourhood.Geometry != null ? Neighbourhood.Geometry.Centroid.X : 0,
-                Geometry = Neighbourhood.Geometry 
+                Id = neighbourhood.Id,
+                Name = neighbourhood.Name,
+                DistrictId = neighbourhood.DistrictId,
+                CenterLatitude = neighbourhood.Geometry != null ? neighbourhood.Geometry.Centroid.Y : 0,
+                CenterLongitude = neighbourhood.Geometry != null ? neighbourhood.Geometry.Centroid.X : 0,
+                Geometry = neighbourhood.Geometry
             };
 
-            if (neighbourhoodWithCentervalues == null)
-            {
-                return NotFound();
-            }
-
-            return Ok(neighbourhoodWithCentervalues);
+            return Ok(neighbourhoodWithCenterValues);
         }
 
         [HttpGet("GetNeighbourhoodByDistrictId/{id}")]
@@ -55,13 +48,13 @@ namespace PotholeApi.Controllers
                 _logger.LogWarning("GetNeighbourhoodByDistrictId: no neighbourhoods found for district {DistrictId}", id);
                 return NotFound();
             }
-            var neighbourdhoodsList = neighbourhoods.Select(n => new neighbourhoodsWithoutGemotry
+            var neighbourhoodsList = neighbourhoods.Select(n => new NeighbourhoodWithoutGeometry
             {
                 Id = n.Id,
                 Name = n.Name,
                 DistrictId = n.DistrictId
             }).ToList();
-            return Ok(neighbourdhoodsList);
+            return Ok(neighbourhoodsList);
         }
 
 

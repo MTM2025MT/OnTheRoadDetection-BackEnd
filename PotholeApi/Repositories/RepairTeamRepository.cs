@@ -1,13 +1,12 @@
-﻿    using Microsoft.EntityFrameworkCore;
+﻿using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging;
 using PotholeApi.IRepositories;
 using PotholeApi.Models;
-    using System;
-    using System.Collections.Generic;
-    using System.Threading.Tasks;
+using System;
+using System.Collections.Generic;
+using System.Threading.Tasks;
 namespace PotholeApi.Repositories
 {
-
     public class RepairTeamRepository : IRepairTeamRepository
     {
         private readonly Context _context;

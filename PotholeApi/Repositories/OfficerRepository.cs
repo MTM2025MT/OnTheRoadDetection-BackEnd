@@ -76,7 +76,7 @@ namespace PotholeApi.Repositories
             if (!exists)
             {
                 _logger.LogWarning("DoesExist: officer {OfficerId} does not exist", id);
-                throw new Exception($"Officer with ID {id} does not exist.");
+                throw new KeyNotFoundException($"Officer with ID {id} does not exist.");
             }
         }
         public async Task<Officer> GetOfficerByUserIdAsync(string userId)
@@ -86,7 +86,7 @@ namespace PotholeApi.Repositories
             if (officer == null)
             {
                 _logger.LogWarning("GetOfficerByUserIdAsync: no officer for user {UserId}", userId);
-                throw new Exception($"Officer with User ID {userId} does not exist.");
+                throw new KeyNotFoundException($"Officer with User ID {userId} does not exist.");
             }
             return officer;
         }

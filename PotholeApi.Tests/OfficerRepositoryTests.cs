@@ -138,7 +138,7 @@ namespace PotholeApi.Tests.Repositories
             using var ctx = TestHelpers.CreateContext(Guid.NewGuid().ToString());
             var repo = new OfficerRepository(ctx, TestHelpers.CreateMockUserManager(), NullLogger<OfficerRepository>.Instance);
 
-            await Assert.ThrowsAsync<Exception>(() => repo.DoesExist(9999));
+            await Assert.ThrowsAsync<KeyNotFoundException>(() => repo.DoesExist(9999));
         }
 
         [Fact]
@@ -166,7 +166,7 @@ namespace PotholeApi.Tests.Repositories
             using var ctx = TestHelpers.CreateContext(Guid.NewGuid().ToString());
             var repo = new OfficerRepository(ctx, TestHelpers.CreateMockUserManager(), NullLogger<OfficerRepository>.Instance);
 
-            await Assert.ThrowsAsync<Exception>(() => repo.GetOfficerByUserIdAsync("no-such-user"));
+            await Assert.ThrowsAsync<KeyNotFoundException>(() => repo.GetOfficerByUserIdAsync("no-such-user"));
         }
     }
 }

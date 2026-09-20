@@ -38,7 +38,7 @@ namespace PotholeApi.Repositories
             // 1. Spatial "Point-in-Polygon" Check
             // Find which Neighbourhood contains this pothole
             var neighbourhoodId = await _context.Neighbourhoods
-                .Where(n => n.Geometry.Intersects(pothole.Location))
+                .Where(n => n.Geometry != null && n.Geometry.Intersects(pothole.Location))
                 .Select(n => (int?)n.Id) // Cast to nullable to handle "not found" gracefully
                 .FirstOrDefaultAsync();
 
@@ -70,12 +70,13 @@ namespace PotholeApi.Repositories
             // FIX: Only update Location if the new one is valid and different
             if (pothole.Location != null && !pothole.Location.Equals(potholeToUpdate.Location))
             {
-                potholeToUpdate.Location = pothole.Location;
-                if (potholeToUpdate.Location.SRID != 4326) potholeToUpdate.Location.SRID = 4326;
+                var newLocation = pothole.Location;
+                if (newLocation.SRID != 4326) newLocation.SRID = 4326;
+                potholeToUpdate.Location = newLocation;
 
                 // Re-calculate Neighbourhood since the location moved
                 var neighbourhoodId = await _context.Neighbourhoods
-                    .Where(n => n.Geometry.Intersects(potholeToUpdate.Location))
+                    .Where(n => n.Geometry != null && n.Geometry.Intersects(newLocation))
                     .Select(n => (int?)n.Id)
                     .FirstOrDefaultAsync();
 
@@ -88,7 +89,7 @@ namespace PotholeApi.Repositories
             return potholeToUpdate;
         }
 
-        public async Task<ICollection<Pothole>> GetPotholesbyRange(double firstLatitude, double firstLongitude, double secondLatitude, double secondLongitude)
+        public async Task<ICollection<Pothole>> GetPotholesByRange(double firstLatitude, double firstLongitude, double secondLatitude, double secondLongitude)
         {
             // 1. Get the corners (Min and Max)
             var minLat = Math.Min(firstLatitude, secondLatitude);
@@ -114,7 +115,7 @@ namespace PotholeApi.Repositories
 
             // 4. Run the Query
             var potholes = await _context.Potholes
-                .Where(p => p.Location.Intersects(bbox))
+                .Where(p => p.Location != null && p.Location.Intersects(bbox))
                 .ToListAsync();
 
             return new Collection<Pothole>(potholes);
@@ -141,10 +142,9 @@ namespace PotholeApi.Repositories
             return await _context.Potholes.ToListAsync();
         }
 
-        public Task<Pothole?> GetPotholeByIdAsync(int id)
+        public async Task<Pothole?> GetPotholeByIdAsync(int id)
         {
-            var pothole = _context.Potholes.FindAsync(id);
-            return pothole.AsTask();
+            return await _context.Potholes.FindAsync(id);
         }
 
         public async Task<ICollection<Pothole>> GetPotholesByDistrictIdAsync(int districtId)

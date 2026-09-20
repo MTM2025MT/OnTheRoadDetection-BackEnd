@@ -1,12 +1,8 @@
-﻿using Microsoft.AspNetCore.Http;
-using Microsoft.AspNetCore.Mvc;
-using Microsoft.EntityFrameworkCore;
-using Microsoft.EntityFrameworkCore.Infrastructure;
+﻿using Microsoft.AspNetCore.Mvc;
 using Microsoft.Extensions.Logging;
 using PotholeApi.DTO;
 using PotholeApi.IRepositories;
 using PotholeApi.Models;
-using PotholeApi.Repositories;
 using System.Threading.Tasks;
 namespace PotholeApi.Controllers
 {
@@ -16,13 +12,11 @@ namespace PotholeApi.Controllers
     {
         IOfficerRepository _officerRepository;
         IScanExecutionTasksRepository _scanExecutionTasksRepository;
-        Context _context;
         private readonly ILogger<OfficerController> _logger;
-        public OfficerController(IScanExecutionTasksRepository ScanExecutionTasksRepository, Context context, IOfficerRepository officerRepository, ILogger<OfficerController> logger)
+        public OfficerController(IScanExecutionTasksRepository scanExecutionTasksRepository, IOfficerRepository officerRepository, ILogger<OfficerController> logger)
         {
             _officerRepository = officerRepository;
-            _context = context;
-            _scanExecutionTasksRepository = ScanExecutionTasksRepository;
+            _scanExecutionTasksRepository = scanExecutionTasksRepository;
             _logger = logger;
         }
         [HttpGet]
@@ -79,23 +73,27 @@ namespace PotholeApi.Controllers
             }
         }
 
-        //[HttpPost]
-        //public IActionResult Create([FromBody] Officer officer)
-        //{
-        //    try
-        //    {
-        //        if(ModelState.IsValid == false)
-        //        {
-        //            return BadRequest(ModelState);
-        //        }
-        //        _officerRepository.AddAsync(officer);
-        //        return CreatedAtAction(nameof(Get), new { id = officer.Id }, officer);
-        //    }
-        //    catch (Exception)
-        //    {
-        //        return StatusCode(500, "Internal server error");
-        //    }
-        //}
+        // Creates an Officer record directly from an existing ApplicationUser.
+        // For assigning the "Officer" role to a new user, use AdminController.AssignRole instead,
+        // which also grants the Identity role via OfficerHandler.
+        [HttpPost]
+        public async Task<IActionResult> Create([FromBody] Officer officer)
+        {
+            try
+            {
+                if (!ModelState.IsValid)
+                {
+                    return BadRequest(ModelState);
+                }
+                await _officerRepository.AddAsync(officer);
+                return CreatedAtAction(nameof(Get), new { id = officer.Id }, officer);
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Create: error creating officer");
+                return StatusCode(500, "Internal server error");
+            }
+        }
 
         [HttpPut("{id}")]
         public async Task<IActionResult> Update(int id, [FromBody] Officer officer)
@@ -113,7 +111,7 @@ namespace PotholeApi.Controllers
                     return NotFound();
                 }
                 officer.Id = id;
-                _officerRepository.UpdateAsync(officer);
+                await _officerRepository.UpdateAsync(officer);
                 return NoContent();
             }
             catch (Exception ex)
