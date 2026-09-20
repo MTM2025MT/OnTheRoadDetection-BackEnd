@@ -31,6 +31,7 @@ namespace PotholeApi.Controllers
             _context = context;
             _logger = logger;
         }
+        // Registers a new user account and assigns default role(s).
         [HttpPost("Register")]
         public async Task<IActionResult> Register(RegisterDto registerDto)
         {
@@ -142,44 +143,44 @@ namespace PotholeApi.Controllers
                 return BadRequest(ModelState);
             }
 
-            ApplicationUser? user = null;
+            ApplicationUser? User = null;
 
             // --- YOUR ORIGINAL LOGIC: Find by Email OR UserName ---
             if (!string.IsNullOrWhiteSpace(loginDto.Email))
             {
-                user = await _userManager.FindByEmailAsync(loginDto.Email);
+                User = await _userManager.FindByEmailAsync(loginDto.Email);
             }
             else if (!string.IsNullOrWhiteSpace(loginDto.UserName))
             {
-                user = await _userManager.FindByNameAsync(loginDto.UserName);
+                User = await _userManager.FindByNameAsync(loginDto.UserName);
             }
             // -----------------------------------------------------
 
-            if (user == null || !await _userManager.CheckPasswordAsync(user, loginDto.Password))
+            if (User == null || !await _userManager.CheckPasswordAsync(User, loginDto.Password))
             {
                 _logger.LogWarning("Login: failed attempt for {Email}{UserName}", loginDto.Email, loginDto.UserName);
                 return Unauthorized("Invalid username or password.");
             }
-            var res = await _userManager.GetRolesAsync(user);
+            var res = await _userManager.GetRolesAsync(User);
 
             var claims = new List<Claim>();
-            if (!string.IsNullOrEmpty(user.Email))
+            if (!string.IsNullOrEmpty(User.Email))
             {
-                claims.Add(new Claim(ClaimTypes.Email, user.Email));
+                claims.Add(new Claim(ClaimTypes.Email, User.Email));
             }
             else
             {
-                claims.Add(new Claim(ClaimTypes.Name, user.UserName ?? user.Id));
+                claims.Add(new Claim(ClaimTypes.Name, User.UserName ?? User.Id));
             }
-            claims.Add(new Claim(ClaimTypes.NameIdentifier, user.Id));
+            claims.Add(new Claim(ClaimTypes.NameIdentifier, User.Id));
 
-            var userRoles = await _userManager.GetRolesAsync(user);
+            var userRoles = await _userManager.GetRolesAsync(User);
             foreach (var role in userRoles)
             {
                 claims.Add(new Claim(ClaimTypes.Role, role));
-            } 
-            var userRoles2 = await _userManager.GetRolesAsync(user);
-            _logger.LogDebug("Login: user {UserId} authenticated with roles [{Roles}]", user.Id, string.Join(", ", userRoles2));
+            }
+            var userRoles2 = await _userManager.GetRolesAsync(User);
+            _logger.LogDebug("Login: user {UserId} authenticated with roles [{Roles}]", User.Id, string.Join(", ", userRoles2));
 
             // 2. Generate Access Token (JWT)
             var secretKey = _configuration["JWT:Secret"] ?? throw new InvalidOperationException("JWT:Secret is not configured.");
@@ -209,16 +210,16 @@ namespace PotholeApi.Controllers
             var refreshToken = PotholeApi.Helpers.GenerateRefreshToken.GenerateTheToken();
 
             // 4. Update User in DB with the new Refresh Token
-            user.RefreshToken = refreshToken;
-            user.RefreshTokenExpiryTime = DateTime.UtcNow.AddDays(7); // Refresh Token: Long Life (7 days)
+            User.RefreshToken = refreshToken;
+            User.RefreshTokenExpiryTime = DateTime.UtcNow.AddDays(7); // Refresh Token: Long Life (7 days)
 
-            await _userManager.UpdateAsync(user);
+            await _userManager.UpdateAsync(User);
 
             // 5. Set HttpOnly Cookie
             var cookieOptions = new CookieOptions
             {
                 HttpOnly = true,   // JavaScript cannot read this (Security)
-                Expires = user.RefreshTokenExpiryTime,
+                Expires = User.RefreshTokenExpiryTime,
                 Secure = true,     // Must use HTTPS
                 SameSite = SameSiteMode.None // Required for Cross-Site requests
             };
@@ -226,9 +227,9 @@ namespace PotholeApi.Controllers
             Response.Cookies.Append("jwt", refreshToken, cookieOptions);
 
             // ==========================================================
-            _logger.LogInformation("User {UserId} logged in", user.Id);
+            _logger.LogInformation("User {UserId} logged in", User.Id);
             // Return the Access Token (Frontend uses this immediately)
-            return Ok(new { token = accessToken, expiration = tokenDescriptor.Expires, id = user.Id ,roles= userRoles2 });
+            return Ok(new { token = accessToken, expiration = tokenDescriptor.Expires, id = User.Id ,roles= userRoles2 });
         }
         [HttpGet("GetUserById")]
         public async Task<IActionResult> GetUserById(string id)
