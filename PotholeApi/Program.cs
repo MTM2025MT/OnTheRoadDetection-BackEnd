@@ -68,7 +68,9 @@ builder.Services.AddScoped<IPotholeRepository, PotholeRepository>();
 builder.Services.AddScoped<IRoleHandler, OfficerHandler>();
 builder.Services.AddScoped<IRoleHandler, AdminHandler>();
 builder.Services.AddScoped<IRoleHandler, ManagerHandler>();
+builder.Services.AddMemoryCache();
 builder.Services.AddScoped<IPotholeDashboardsService, PotholeDashboardsService>();
+builder.Services.AddHostedService<DashboardCacheRefreshWorker>();
 //builder.Services.AddScoped<IRoleHandler, RepairTeamHandler>();
 // jwl part
 builder.Services.AddDbContext<Context>(options =>

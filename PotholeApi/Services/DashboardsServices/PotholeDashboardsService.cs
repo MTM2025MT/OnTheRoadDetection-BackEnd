@@ -1,8 +1,10 @@
 ﻿using Microsoft.AspNetCore.Identity;
+using Microsoft.Extensions.Caching.Memory;
 using Microsoft.Extensions.Logging;
 using PotholeApi.DTO;
 using PotholeApi.IRepositories;
 using PotholeApi.Models;
+using System;
 using System.Threading.Tasks;
 using static PotholeApi.Models.Enums;
 namespace PotholeApi.Services.DashboardsServices
@@ -20,17 +22,40 @@ namespace PotholeApi.Services.DashboardsServices
         private readonly Context _context;
         private readonly INeighbourhoodRepository _neighbourhoodRepository;
         private readonly ILogger<PotholeDashboardsService> _logger;
+        private readonly IMemoryCache _cache;
 
-        public PotholeDashboardsService(INeighbourhoodRepository neighbourhoodRepository, Context context, IPotholeRepository potholeRepository, UserManager<ApplicationUser> userManager, ILogger<PotholeDashboardsService> logger)
+        private static readonly TimeSpan CacheDuration = TimeSpan.FromMinutes(5);
+        private static string CacheKey(int officerId) => $"PotholeDashboard_{officerId}";
+
+        public PotholeDashboardsService(INeighbourhoodRepository neighbourhoodRepository, Context context, IPotholeRepository potholeRepository, UserManager<ApplicationUser> userManager, ILogger<PotholeDashboardsService> logger, IMemoryCache cache)
         {
             _userManager = userManager;
             _potholeRepository = potholeRepository;
             _context = context;
             _neighbourhoodRepository = neighbourhoodRepository;
             _logger = logger;
+            _cache = cache;
         }
 
         public async Task<DashboardPotholeDataDto> GetPotholeDashboardsServices(int officerId)
+        {
+            if (_cache.TryGetValue(CacheKey(officerId), out DashboardPotholeDataDto? cached) && cached != null)
+            {
+                return cached;
+            }
+
+            _logger.LogDebug("GetPotholeDashboardsServices: cache miss for officer {OfficerId}, computing", officerId);
+            return await RefreshDashboardCacheAsync(officerId);
+        }
+
+        public async Task<DashboardPotholeDataDto> RefreshDashboardCacheAsync(int officerId)
+        {
+            var data = await BuildDashboardDataAsync(officerId);
+            _cache.Set(CacheKey(officerId), data, CacheDuration);
+            return data;
+        }
+
+        private async Task<DashboardPotholeDataDto> BuildDashboardDataAsync(int officerId)
         {
             var districtOfTheOfficer = _context.Officers
                 .Where(o => o.Id == officerId)
