@@ -1,4 +1,5 @@
 ﻿using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Logging;
 using NetTopologySuite.Geometries;
 using PotholeApi.IRepositories;
 using PotholeApi.Models;
@@ -10,10 +11,12 @@ namespace PotholeApi.Repositories
     public class DistrictRepository : IDistrictRepository
     {
         private readonly Context _context;
+        private readonly ILogger<DistrictRepository> _logger;
 
-        public DistrictRepository(Context context)
+        public DistrictRepository(Context context, ILogger<DistrictRepository> logger)
         {
             _context = context;
+            _logger = logger;
         }
 
         public async Task<IEnumerable<District>> GetAllAsync()
@@ -23,7 +26,12 @@ namespace PotholeApi.Repositories
 
         public async Task<District?> GetByIdAsync(int id)
         {
-            return await _context.Districts.FindAsync(id);
+            var district = await _context.Districts.FindAsync(id);
+            if (district == null)
+            {
+                _logger.LogWarning("GetByIdAsync: district {DistrictId} not found", id);
+            }
+            return district;
         }
         public async Task<List<DistrictJustText>> GetDistrictNamesAsync()
         {

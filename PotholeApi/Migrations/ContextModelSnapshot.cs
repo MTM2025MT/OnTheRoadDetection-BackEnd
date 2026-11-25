@@ -250,7 +250,7 @@ namespace PotholeApi.Migrations
 
                     b.HasKey("Id");
 
-                    b.ToTable("Districts");
+                    b.ToTable("Districts", (string)null);
                 });
 
             modelBuilder.Entity("PotholeApi.Models.GpsCoordinate", b =>
@@ -274,7 +274,7 @@ namespace PotholeApi.Migrations
 
                     b.HasIndex("ScanExecutionTaskId");
 
-                    b.ToTable("GpsCoordinates");
+                    b.ToTable("GpsCoordinates", (string)null);
                 });
 
             modelBuilder.Entity("PotholeApi.Models.JobTask", b =>
@@ -320,7 +320,7 @@ namespace PotholeApi.Migrations
 
                     b.HasIndex("RepairTeamId");
 
-                    b.ToTable("JobTasks");
+                    b.ToTable("JobTasks", (string)null);
                 });
 
             modelBuilder.Entity("PotholeApi.Models.Neighbourhood", b =>
@@ -345,7 +345,7 @@ namespace PotholeApi.Migrations
 
                     b.HasIndex("DistrictId");
 
-                    b.ToTable("Neighbourhoods");
+                    b.ToTable("Neighbourhoods", (string)null);
                 });
 
             modelBuilder.Entity("PotholeApi.Models.Officer", b =>
@@ -383,7 +383,7 @@ namespace PotholeApi.Migrations
 
                     b.HasIndex("DistrictId");
 
-                    b.ToTable("Officers");
+                    b.ToTable("Officers", (string)null);
                 });
 
             modelBuilder.Entity("PotholeApi.Models.Pothole", b =>
@@ -412,14 +412,19 @@ namespace PotholeApi.Migrations
                     b.Property<DateTime>("ReportedAt")
                         .HasColumnType("datetime2");
 
-                    b.Property<int?>("confidence")
-                        .HasColumnType("int");
+                    b.Property<int>("Status")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("int")
+                        .HasDefaultValue(1);
+
+                    b.Property<double?>("confidence")
+                        .HasColumnType("float");
 
                     b.HasKey("Id");
 
                     b.HasIndex("NeighbourhoodId");
 
-                    b.ToTable("Potholes");
+                    b.ToTable("Potholes", (string)null);
                 });
 
             modelBuilder.Entity("PotholeApi.Models.RepairTeam", b =>
@@ -448,7 +453,7 @@ namespace PotholeApi.Migrations
 
                     b.HasKey("Id");
 
-                    b.ToTable("RepairTeams");
+                    b.ToTable("RepairTeams", (string)null);
                 });
 
             modelBuilder.Entity("PotholeApi.Models.RoutePoint", b =>
@@ -475,7 +480,7 @@ namespace PotholeApi.Migrations
 
                     b.HasIndex("ScanExecutionTaskId");
 
-                    b.ToTable("RoutePoints");
+                    b.ToTable("RoutePoints", (string)null);
                 });
 
             modelBuilder.Entity("PotholeApi.Models.ScanExecutionTask", b =>
@@ -520,7 +525,7 @@ namespace PotholeApi.Migrations
 
                     b.HasKey("Id");
 
-                    b.ToTable("ScanExecutionTasks");
+                    b.ToTable("ScanExecutionTasks", (string)null);
                 });
 
             modelBuilder.Entity("PotholeApi.Models.Street", b =>
@@ -548,7 +553,7 @@ namespace PotholeApi.Migrations
 
                     b.HasIndex("NeighbourhoodId");
 
-                    b.ToTable("Streets");
+                    b.ToTable("Streets", (string)null);
                 });
 
             modelBuilder.Entity("Microsoft.AspNetCore.Identity.IdentityRoleClaim<string>", b =>

@@ -4,11 +4,8 @@ using static PotholeApi.Models.Enums;
 
 namespace PotholeApi.DTO
 {
-    public class JobTaskcreate
+    public class JobTaskCreateDto
     {
-
-
-
         public int PotholeId { get; set; }
         public int OfficerId { get; set; }
         public int RepairTeamId { get; set; }

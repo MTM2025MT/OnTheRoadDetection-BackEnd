@@ -1,7 +1,5 @@
-﻿using Microsoft.AspNetCore.Http;
-using Microsoft.AspNetCore.Mvc;
-using Microsoft.EntityFrameworkCore;
-using Microsoft.EntityFrameworkCore.Infrastructure;
+﻿using Microsoft.AspNetCore.Mvc;
+using Microsoft.Extensions.Logging;
 using PotholeApi.DTO;
 using PotholeApi.IRepositories;
 using PotholeApi.Models;
@@ -13,81 +11,92 @@ namespace PotholeApi.Controllers
     public class OfficerController : ControllerBase
     {
         IOfficerRepository _officerRepository;
-        Context _context;
-        public OfficerController(Context context, IOfficerRepository officerRepository)
+        IScanExecutionTasksRepository _scanExecutionTasksRepository;
+        private readonly ILogger<OfficerController> _logger;
+        public OfficerController(IScanExecutionTasksRepository scanExecutionTasksRepository, IOfficerRepository officerRepository, ILogger<OfficerController> logger)
         {
             _officerRepository = officerRepository;
-            _context = context;
+            _scanExecutionTasksRepository = scanExecutionTasksRepository;
+            _logger = logger;
         }
         [HttpGet]
-        public IActionResult GetAll()
+        public async Task<IActionResult> GetAll()
         {
             try
             {
-                var potholes = _officerRepository.GetAllAsync();
+                var potholes = await _officerRepository.GetAllAsync();
                 return Ok(potholes);
             }
-            catch (Exception)
+            catch (Exception ex)
             {
+                _logger.LogError(ex, "GetAll: error fetching officers");
                 return StatusCode(500, "Internal server error");
             }
         }
         [HttpGet("{id}")]
-        public IActionResult Get(int id)
+        public async Task<IActionResult> Get(int id)
         {
             try
             {
-                var officer = _officerRepository.GetByIdAsync(id);
+                var officer = await _officerRepository.GetByIdAsync(id);
                 if (officer == null)
                 {
+                    _logger.LogWarning("Get: officer {OfficerId} not found", id);
                     return NotFound();
                 }
                 return Ok(officer);
             }
-            catch (Exception)
+            catch (Exception ex)
             {
+                _logger.LogError(ex, "Get: error fetching officer {OfficerId}", id);
                 return StatusCode(500, "Internal server error");
             }
         }
 
         [HttpGet("{id}/jobtasks")]
-        public IActionResult GetOfficerWithJobTasks(int id)
+        public async Task<IActionResult> GetOfficerWithJobTasks(int id)
         {
             try
             {
-                var officer = _officerRepository.GetOfficerWithJobTasksAsync(id);
+                var officer = await _officerRepository.GetOfficerWithJobTasksAsync(id);
                 if (officer == null)
                 {
+                    _logger.LogWarning("GetOfficerWithJobTasks: officer {OfficerId} not found", id);
                     return NotFound();
                 }
                 return Ok(officer);
             }
-            catch (Exception)
+            catch (Exception ex)
             {
+                _logger.LogError(ex, "GetOfficerWithJobTasks: error fetching officer {OfficerId}", id);
                 return StatusCode(500, "Internal server error");
             }
         }
 
-        //[HttpPost]
-        //public IActionResult Create([FromBody] Officer officer)
-        //{
-        //    try
-        //    {
-        //        if(ModelState.IsValid == false)
-        //        {
-        //            return BadRequest(ModelState);
-        //        }
-        //        _officerRepository.AddAsync(officer);
-        //        return CreatedAtAction(nameof(Get), new { id = officer.Id }, officer);
-        //    }
-        //    catch (Exception)
-        //    {
-        //        return StatusCode(500, "Internal server error");
-        //    }
-        //}
+        // Creates an Officer record directly from an existing ApplicationUser.
+        // For assigning the "Officer" role to a new user, use AdminController.AssignRole instead,
+        // which also grants the Identity role via OfficerHandler.
+        [HttpPost]
+        public async Task<IActionResult> Create([FromBody] Officer officer)
+        {
+            try
+            {
+                if (!ModelState.IsValid)
+                {
+                    return BadRequest(ModelState);
+                }
+                await _officerRepository.AddAsync(officer);
+                return CreatedAtAction(nameof(Get), new { id = officer.Id }, officer);
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Create: error creating officer");
+                return StatusCode(500, "Internal server error");
+            }
+        }
 
         [HttpPut("{id}")]
-        public IActionResult Update(int id, [FromBody] Officer officer)
+        public async Task<IActionResult> Update(int id, [FromBody] Officer officer)
         {
             try
             {
@@ -95,42 +104,46 @@ namespace PotholeApi.Controllers
                 {
                     return BadRequest(ModelState);
                 }
-                var existingOfficer = _officerRepository.GetByIdAsync(id);
+                var existingOfficer = await _officerRepository.GetByIdAsync(id);
                 if (existingOfficer == null)
                 {
+                    _logger.LogWarning("Update: officer {OfficerId} not found", id);
                     return NotFound();
                 }
                 officer.Id = id;
-                _officerRepository.UpdateAsync(officer);
+                await _officerRepository.UpdateAsync(officer);
                 return NoContent();
             }
-            catch (Exception)
+            catch (Exception ex)
             {
+                _logger.LogError(ex, "Update: error updating officer {OfficerId}", id);
                 return StatusCode(500, "Internal server error");
             }
         }
 
         [HttpDelete("{id}")]
-        public IActionResult Delete(int id)
+        public async Task<IActionResult> Delete(int id)
         {
             try
             {
-                var existingOfficer = _officerRepository.GetByIdAsync(id);
+                var existingOfficer = await _officerRepository.GetByIdAsync(id);
                 if (existingOfficer == null)
                 {
+                    _logger.LogWarning("Delete: officer {OfficerId} not found", id);
                     return NotFound();
                 }
-                _officerRepository.DeleteAsync(id);
+                await _officerRepository.DeleteAsync(id);
                 return NoContent();
             }
-            catch (Exception)
+            catch (Exception ex)
             {
+                _logger.LogError(ex, "Delete: error deleting officer {OfficerId}", id);
                 return StatusCode(500, "Internal server error");
             }
         }
 
         [HttpPost("CreateScanTask")]
-        public IActionResult CreateScanTask([FromBody] ScanExecutionTaskDto dto)
+        public async Task<IActionResult> CreateScanTask([FromBody] ScanExecutionTaskDto dto)
         {
             if (!ModelState.IsValid) return BadRequest(ModelState);
 
@@ -159,15 +172,16 @@ namespace PotholeApi.Controllers
                 }).ToList()
             };
 
-            _context.ScanExecutionTasks.Add(entity);
-            _context.SaveChanges();
+
+            await _scanExecutionTasksRepository.AddAsync(entity);
+            _logger.LogInformation("Created scan task for vehicle {VehicleId}", dto.VehicleId);
             return Ok(entity);
         }
 
         [HttpGet("GetScanTasks")]
         public async Task<IActionResult> GetScanTasks()
         {
-            var res = await  _context.ScanExecutionTasks.Include(S=>S.RoutePoints) .ToListAsync();
+            var res = await _scanExecutionTasksRepository.GetAllAsync();
             return Ok(res);
         }
 

@@ -19,6 +19,7 @@ namespace PotholeApi.Models
         public double Longitude => Location?.X ?? 0;
         public string? Description { get; set; }
         public Level LevelOfSeverity { get; set; }
+        public RepairStatus Status { get; set; } = RepairStatus.Pending;
         public string? ImageUrl { get; set; }
         public DateTime ReportedAt { get; set; }
         public int? NeighbourhoodId { get; set; }

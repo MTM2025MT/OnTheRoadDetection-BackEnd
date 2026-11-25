@@ -16,5 +16,11 @@
             Urgent,
             Emergency
         }
+        public enum RepairStatus
+        {
+            Pending = 1,
+            InProgress,
+            Fixed
+        }
     }
 }

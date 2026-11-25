@@ -1,65 +1,74 @@
-﻿using PotholeApi.Models;
-using PotholeApi.Repositories;
+﻿using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Hosting;
+using Microsoft.Extensions.Logging;
+using PotholeApi.Models;
+using System.Collections.Generic;
+using System.Threading;
+using System.Threading.Tasks;
 
 namespace PotholeApi.Services
 {
-    public class DetectionDatabaseWorker: BackgroundService
+    public class DetectionDatabaseWorker : BackgroundService
     {
         private readonly DetectionQueue _queue;
         private readonly IServiceProvider _serviceProvider;
         private readonly ILogger<DetectionDatabaseWorker> _logger;
-        private readonly PotholeRepository _potholeRepository;
-        private readonly PhotoService _photoService;
-        public DetectionDatabaseWorker(PhotoService photoService, DetectionQueue queue, IServiceProvider serviceProvider, ILogger<DetectionDatabaseWorker> logger, PotholeRepository PotholeRepository)
+
+        public DetectionDatabaseWorker(DetectionQueue queue, IServiceProvider serviceProvider, ILogger<DetectionDatabaseWorker> logger)
         {
             _queue = queue;
             _serviceProvider = serviceProvider;
             _logger = logger;
-            _potholeRepository = PotholeRepository;
-            _photoService = photoService;
         }
 
         protected override async Task ExecuteAsync(CancellationToken stoppingToken)
         {
-            const int BATCH_SIZE = 100; // Adjust based on your needs
+            const int BATCH_SIZE = 100;
             var batch = new List<Pothole>();
-            
+
             await foreach (var payload in _queue.ReadAllAsync(stoppingToken))
             {
                 try
                 {
-                    // Upload image
-                    var ImageUrl = "";
-                    var ImageRes = await _photoService.UploadPhotoWithResultAsBytesAsync(payload.Image);
-                    if (ImageRes != null)
-                    {
-                        ImageUrl = ImageRes.Url?.ToString() ?? "";
-                    }
+                    string ImageUrl = "";
 
-                    // Add to batch
-                    batch.Add(new Pothole
+                    using (var scope = _serviceProvider.CreateScope())
                     {
-                        Location = new NetTopologySuite.Geometries.Point(
-                            payload.Location.Longitude,
-                            payload.Location.Latitude
-                        ) { SRID = 4326 },
-                        ReportedAt = DateTime.UtcNow,
-                        LevelOfSeverity = payload.LevelOfSeverity switch
+                        // Resolve scoped services safely
+                        var photoService = scope.ServiceProvider.GetRequiredService<IPhotoService>();
+                        var imageRes = await photoService.UploadPhotoWithResultAsBytesAsync(payload.Image);
+                        if (imageRes != null) ImageUrl = imageRes.Url?.ToString() ?? "";
+
+                        // Optionally resolve the repository or DbContext for saving
+                        var dbContext = scope.ServiceProvider.GetRequiredService<Context>();
+
+                        // Build and add pothole to batch
+                        batch.Add(new Pothole
                         {
-                            >= 7 => Enums.Level.High,
-                            >= 4 => Enums.Level.Medium,
-                            _ => Enums.Level.Low,
-                        },
-                        confidence = payload.Confidence,
-                        Description = payload.Description,
-                        ImageUrl = ImageUrl
-                    });
+                            Location = new NetTopologySuite.Geometries.Point(
+                                payload.Location.Longitude,
+                                payload.Location.Latitude
+                            )
+                            { SRID = 4326 },
+                            ReportedAt = DateTime.UtcNow,
+                            LevelOfSeverity = payload.LevelOfSeverity switch
+                            {
+                                >= 7 => Enums.Level.High,
+                                >= 4 => Enums.Level.Medium,
+                                _ => Enums.Level.Low,
+                            },
+                            confidence = payload.Confidence,
+                            Description = payload.Description,
+                            ImageUrl = ImageUrl
+                        });
 
-                    // Save batch when full
-                    if (batch.Count >= BATCH_SIZE)
-                    {
-                        await SaveBatchAsync(batch, stoppingToken);
-                        batch.Clear();
+                        if (batch.Count >= BATCH_SIZE)
+                        {
+                            dbContext.Potholes.AddRange(batch);
+                            await dbContext.SaveChangesAsync(stoppingToken);
+                            batch.Clear();
+                            _logger.LogInformation("Saved batch of potholes");
+                        }
                     }
                 }
                 catch (Exception ex)
@@ -67,23 +76,15 @@ namespace PotholeApi.Services
                     _logger.LogError(ex, "Error processing pothole detection");
                 }
             }
-            
-            // Save any remaining items
+
             if (batch.Count > 0)
             {
-                await SaveBatchAsync(batch, stoppingToken);
+                using var scope = _serviceProvider.CreateScope();
+                var dbContext = scope.ServiceProvider.GetRequiredService<Context>();
+                dbContext.Potholes.AddRange(batch);
+                await dbContext.SaveChangesAsync(stoppingToken);
+                _logger.LogInformation($"Saved final batch of {batch.Count} potholes");
             }
-        }
-
-        private async Task SaveBatchAsync(List<Pothole> potholes, CancellationToken stoppingToken)
-        {
-            using var scope = _serviceProvider.CreateScope();
-            var dbContext = scope.ServiceProvider.GetRequiredService<Context>();
-            
-            dbContext.Potholes.AddRange(potholes);
-            await dbContext.SaveChangesAsync(stoppingToken);
-            
-            _logger.LogInformation($"Saved batch of {potholes.Count} potholes to database");
         }
     }
 }

@@ -1,8 +1,7 @@
-﻿using CloudinaryDotNet.Actions;
-using Microsoft.AspNetCore.Http;
-using Microsoft.AspNetCore.Identity;
+﻿using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Logging;
 using PotholeApi.DTO;
 using PotholeApi.Models;
 using PotholeApi.Services;
@@ -14,19 +13,21 @@ namespace PotholeApi.Controllers
     [ApiController]
     public class AdminController : ControllerBase
     {
-        
+
         private readonly ISeedRoleAdminServices _seedRoleAdminServices;
         private readonly RoleManager<IdentityRole> _roleManager;
         private readonly UserManager<ApplicationUser> _userManager;
         private readonly Context _context;
         private readonly IEnumerable<IRoleHandler> _roleHandlers;
-        public AdminController(IEnumerable<IRoleHandler> roleHandlers, Context context,ISeedRoleAdminServices seedRoleAdminServices,RoleManager<IdentityRole> RoleManager,UserManager<ApplicationUser> UserManager)
+        private readonly ILogger<AdminController> _logger;
+        public AdminController(IEnumerable<IRoleHandler> roleHandlers, Context context, ISeedRoleAdminServices seedRoleAdminServices, RoleManager<IdentityRole> roleManager, UserManager<ApplicationUser> userManager, ILogger<AdminController> logger)
         {
             _seedRoleAdminServices = seedRoleAdminServices;
-            _roleManager = RoleManager;
-            _userManager = UserManager;
+            _roleManager = roleManager;
+            _userManager = userManager;
             _context = context;
             _roleHandlers = roleHandlers;
+            _logger = logger;
         }
         [HttpPost("CreateRole")]
         public async Task<IActionResult> CreateRole([FromBody] RoleCreateDto roleDto)
@@ -40,21 +41,24 @@ namespace PotholeApi.Controllers
 
             if (roleExists)
             {
+                _logger.LogWarning("CreateRole: role {RoleName} already exists", roleDto.RoleName);
                 return BadRequest($"Role '{roleDto.RoleName}' already exists.");
             }
 
-            
+
             // 3. Async Create: Use await here
             var result = await _seedRoleAdminServices.CreateRoleAsync(roleDto.RoleName);
 
             var isThereHandlerForThisRole = _roleHandlers.Any(h => h.RoleName == roleDto.RoleName);
             if (isThereHandlerForThisRole) {
+                _logger.LogWarning("CreateRole: role {RoleName} has a dedicated handler, refusing generic creation", roleDto.RoleName);
                 return BadRequest($"Role '{roleDto.RoleName}' cannot be created because it has a specific handler. Please use the appropriate endpoint for that role.");
             }
             // Optional: Check if the service actually succeeded
             // (Assuming your service returns a boolean or IdentityResult)
             // if (!result.Succeeded) return BadRequest("Could not create role.");
 
+            _logger.LogInformation("Created role {RoleName}", roleDto.RoleName);
             return Ok($"Role '{roleDto.RoleName}' created successfully.");
         }
         [HttpGet("GetAllRoles")]
@@ -66,79 +70,21 @@ namespace PotholeApi.Controllers
             {
                 return NotFound("No roles found.");
             }
-            
+
             return Ok(roles);
         }
         [HttpDelete("DeleteRole")]
-        public IActionResult DeleteRole(string roleName)
+        public async Task<IActionResult> DeleteRole(string roleName)
         {
-            var result =  _seedRoleAdminServices.DeleteRoleAsync(roleName).Result;
+            var result = await _seedRoleAdminServices.DeleteRoleAsync(roleName);
             if (!result)
             {
+                _logger.LogWarning("DeleteRole: role {RoleName} not found", roleName);
                 return NotFound($"Role '{roleName}' not found.");
             }
+            _logger.LogInformation("Deleted role {RoleName}", roleName);
             return Ok($"Role '{roleName}' deleted successfully.");
         }
-        //[HttpPost("AssignRoleToUser")]
-        //public async Task<IActionResult> AssignRoleToUserAndCreateItsClassAsync(string userId, string roleName)
-        //{
-        //    // Implementation for assigning role to user
-        //    using var transaction = _context.Database.BeginTransaction();
-
-        //    try
-        //    {
-
-        //        var res = _seedRoleAdminServices.EnterNewRoleForUser(new PotholeApi.Models.ApplicationUser { Id = userId }, new IdentityRole { Name = roleName }).Result;
-        //        if (!res)
-        //        {
-        //            return BadRequest("Could not assign role to user.");
-        //        }
-        //        if (roleName == "Officer")
-        //        {
-        //            var officerCreation = _seedRoleAdminServices.CreateOfficerForUserAsync(userId).Result;
-        //            if (!officerCreation)
-        //            {
-        //                return BadRequest("Could not create Officer profile for user.");
-        //            }
-        //            return Ok();
-        //        }
-        //        if (roleName == "RepairTeam")
-        //        {
-        //            var repairTeamCreation = _seedRoleAdminServices.CreateRepairTeamForUserAsync(userId).Result;
-        //            if (!repairTeamCreation)
-        //            {
-        //                return BadRequest("Could not create RepairTeam profile for user.");
-        //            }
-        //            return Ok();
-        //        }
-        //        if (roleName == "Admin")
-        //        {
-        //            var adminCreation = _seedRoleAdminServices.CreateAdminForUserAsync(userId).Result;
-        //            if (!adminCreation)
-        //            {
-        //                return BadRequest("Could not create Admin profile for user.");
-        //            }
-        //            return Ok();
-        //        }
-        //        if (roleName == "Worker")
-        //        {
-        //            var workerCreation = _seedRoleAdminServices.CreateWorkerForUserAsync(userId).Result;
-        //            if (!workerCreation)
-        //            {
-        //                return BadRequest("Could not create Worker profile for user.");
-        //            }
-        //            return Ok();
-        //        }
-        //    }
-
-        //    catch (Exception ex)
-        //    {
-        //        await transaction.RollbackAsync();
-
-        //        return BadRequest("Operation failed. Changes were undone. Error: " + ex.Message);
-        //    }
-        //    return Ok();
-        //}
 
         [HttpPost("AssignRole")]
         public async Task<IActionResult> AssignRole([FromBody] BaseRoleAssignmentDto dto)
@@ -153,7 +99,7 @@ namespace PotholeApi.Controllers
             try
             {
                 // 2. Assign the Identity Role (Common for everyone)
-                var user = await _userManager.FindByIdAsync(dto.UserId.ToString());
+                var user = await _userManager.FindByIdAsync(dto.UserId);
                 //bool success = await _seedRoleAdminServices.EnterNewRoleForUser(user, targetRole);
                 //if (!success) return BadRequest("Could not assign Identity role.");
 
@@ -167,11 +113,13 @@ namespace PotholeApi.Controllers
                 }
 
                 await transaction.CommitAsync();
+                _logger.LogInformation("Assigned role {RoleName} to user {UserId}", targetRole, dto.UserId);
                 return Ok($"{targetRole} assigned and profile created.");
             }
             catch (Exception ex)
             {
                 await transaction.RollbackAsync();
+                _logger.LogError(ex, "AssignRole: failed to assign role {RoleName} to user {UserId}", targetRole, dto.UserId);
                 return BadRequest(ex.Message);
             }
         }

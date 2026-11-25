@@ -11,7 +11,9 @@ namespace PotholeApi.Migrations
         protected override void Up(MigrationBuilder migrationBuilder)
         {
             // 1. Remove the old Index
-
+            migrationBuilder.DropIndex(
+                name: "IX_Potholes_Latitude_Longitude",
+                table: "Potholes");
 
             // 2. Remove the old Columns
             migrationBuilder.DropColumn(

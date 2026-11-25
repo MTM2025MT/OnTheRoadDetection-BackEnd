@@ -1,4 +1,5 @@
 ﻿using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Logging;
 using PotholeApi.IRepositories;
 using PotholeApi.Models;
 
@@ -9,10 +10,12 @@ namespace PotholeApi.Repositories
     public class JobTaskRepository : IJobTaskRepository
     {
         private readonly Context _context;
+        private readonly ILogger<JobTaskRepository> _logger;
 
-        public JobTaskRepository(Context context)
+        public JobTaskRepository(Context context, ILogger<JobTaskRepository> logger)
         {
             _context = context;
+            _logger = logger;
         }
 
         public async Task<ICollection<JobTask>> GetAllAsync()
@@ -47,6 +50,7 @@ namespace PotholeApi.Repositories
         {
             await _context.JobTasks.AddAsync(jobTask);
             await _context.SaveChangesAsync();
+            _logger.LogInformation("Created job task {JobTaskId} for officer {OfficerId}", jobTask.Id, jobTask.OfficerId);
             return jobTask;
         }
 
@@ -54,6 +58,7 @@ namespace PotholeApi.Repositories
         {
             _context.JobTasks.Update(jobTask);
             await _context.SaveChangesAsync();
+            _logger.LogInformation("Updated job task {JobTaskId}", jobTask.Id);
         }
 
         public async Task DeleteAsync(int id)
@@ -63,6 +68,11 @@ namespace PotholeApi.Repositories
             {
                 _context.JobTasks.Remove(jobTask);
                 await _context.SaveChangesAsync();
+                _logger.LogInformation("Deleted job task {JobTaskId}", id);
+            }
+            else
+            {
+                _logger.LogWarning("DeleteAsync: job task {JobTaskId} not found", id);
             }
         }
         public async Task<bool>  PotholeWithTaskExistAsync(int potholeId)
